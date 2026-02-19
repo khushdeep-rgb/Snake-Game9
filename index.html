@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Khushdeep's Ready Snake</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background: #121212;
+            color: #fff;
+            font-family: 'Segoe UI', sans-serif;
+            overflow: hidden;
+        }
+        canvas {
+            border: 4px solid #444;
+            background-color: #000;
+            box-shadow: 0 0 20px rgba(46, 204, 113, 0.2);
+        }
+        .score-board {
+            font-size: 30px;
+            margin-bottom: 10px;
+            font-weight: bold;
+            color: #2ecc71;
+        }
+        #message {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.8);
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            border: 2px solid #2ecc71;
+            z-index: 10;
+        }
+        .controls {
+            margin-top: 20px;
+            display: grid;
+            grid-template-columns: repeat(3, 70px);
+            gap: 10px;
+        }
+        button {
+            width: 70px;
+            height: 60px;
+            font-size: 24px;
+            background: #333;
+            border: 1px solid #555;
+            color: white;
+            border-radius: 10px;
+            cursor: pointer;
+        }
+        button:active { background: #2ecc71; }
+        .up { grid-column: 2; }
+        .left { grid-column: 1; }
+        .down { grid-column: 2; }
+        .right { grid-column: 3; }
+    </style>
+</head>
+<body>
+
+    <div class="score-board">SCORE: <span id="score">0</span></div>
+    
+    <div id="game-container" style="position: relative;">
+        <canvas id="snakeGame" width="400" height="400"></canvas>
+        <div id="message">साँप को चलाने के लिए <br> कोई भी Arrow Key दबाएं!</div>
+    </div>
+
+    <div class="controls">
+        <button class="up" onclick="changeDir('UP')">↑</button>
+        <button class="left" onclick="changeDir('LEFT')">←</button>
+        <button class="down" onclick="changeDir('DOWN')">↓</button>
+        <button class="right" onclick="changeDir('RIGHT')">→</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById("snakeGame");
+        const ctx = canvas.getContext("2d");
+        const scoreElement = document.getElementById("score");
+        const messageBox = document.getElementById("message");
+
+        const box = 20;
+        let score = 0;
+        let d = null; // गेम रुक कर शुरू होगा
+        let gameStarted = false;
+        let gameSpeed = 160;
+
+        let snake = [
+            { x: 9 * box, y: 10 * box },
+            { x: 8 * box, y: 10 * box }
+        ];
+
+        let food = {
+            x: Math.floor(Math.random() * 19) * box,
+            y: Math.floor(Math.random() * 19) * box
+        };
+
+        document.addEventListener("keydown", (e) => {
+            if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(e.key)) {
+                e.preventDefault();
+                startGame();
+            }
+            if(e.key === "ArrowLeft" && d !== "RIGHT") d = "LEFT";
+            else if(e.key === "ArrowUp" && d !== "DOWN") d = "UP";
+            else if(e.key === "ArrowRight" && d !== "LEFT") d = "RIGHT";
+            else if(e.key === "ArrowDown" && d !== "UP") d = "DOWN";
+        });
+
+        function changeDir(dir) {
+            startGame();
+            if(dir === "LEFT" && d !== "RIGHT") d = "LEFT";
+            if(dir === "UP" && d !== "DOWN") d = "UP";
+            if(dir === "RIGHT" && d !== "LEFT") d = "RIGHT";
+            if(dir === "DOWN" && d !== "UP") d = "DOWN";
+        }
+
+        function startGame() {
+            if(!gameStarted) {
+                gameStarted = true;
+                messageBox.style.display = "none";
+            }
+        }
+
+        function drawGrid() {
+            ctx.strokeStyle = "#1a1a1a";
+            for (let i = 0; i <= canvas.width; i += box) {
+                ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(canvas.width, i); ctx.stroke();
+            }
+        }
+
+        function drawApple(x, y) {
+            ctx.fillStyle = "#ff4757";
+            ctx.beginPath(); ctx.arc(x + box/2, y + box/2 + 2, 8, 0, Math.PI * 2); ctx.fill();
+            ctx.strokeStyle = "#747d8c"; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(x + box/2, y + 6); ctx.lineTo(x + box/2, y + 2); ctx.stroke();
+            ctx.fillStyle = "#2ed573";
+            ctx.beginPath(); ctx.ellipse(x + box/2 + 3, y + 3, 4, 2, Math.PI / 4, 0, Math.PI * 2); ctx.fill();
+        }
+
+        function drawSnake(part, index) {
+            if (index === 0) {
+                ctx.fillStyle = "#2ecc71";
+                ctx.beginPath(); ctx.roundRect(part.x, part.y, box, box, 5); ctx.fill();
+                ctx.fillStyle = "white";
+                if(d === "RIGHT") { ctx.fillRect(part.x + 12, part.y + 4, 4, 4); ctx.fillRect(part.x + 12, part.y + 12, 4, 4); }
+                else if(d === "LEFT") { ctx.fillRect(part.x + 4, part.y + 4, 4, 4); ctx.fillRect(part.x + 4, part.y + 12, 4, 4); }
+                else if(d === "UP") { ctx.fillRect(part.x + 4, part.y + 4, 4, 4); ctx.fillRect(part.x + 12, part.y + 4, 4, 4); }
+                else if(d === "DOWN") { ctx.fillRect(part.x + 4, part.y + 12, 4, 4); ctx.fillRect(part.x + 12, part.y + 12, 4, 4); }
+                else { ctx.fillRect(part.x + 12, part.y + 4, 4, 4); ctx.fillRect(part.x + 12, part.y + 12, 4, 4); }
+            } else {
+                ctx.fillStyle = "#27ae60";
+                ctx.beginPath(); ctx.roundRect(part.x + 2, part.y + 2, box - 4, box - 4, 10); ctx.fill();
+            }
+        }
+
+        function draw() {
+            ctx.fillStyle = "black";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            drawGrid();
+            drawApple(food.x, food.y);
+            snake.forEach((part, index) => drawSnake(part, index));
+
+            if(!gameStarted) return; // जब तक शुरू न हो, आगे न बढ़ें
+
+            let snakeX = snake[0].x;
+            let snakeY = snake[0].y;
+
+            if(d === "LEFT") snakeX -= box;
+            if(d === "UP") snakeY -= box;
+            if(d === "RIGHT") snakeX += box;
+            if(d === "DOWN") snakeY += box;
+
+            if(snakeX === food.x && snakeY === food.y) {
+                score++;
+                scoreElement.innerHTML = score;
+                food = { x: Math.floor(Math.random() * 19) * box, y: Math.floor(Math.random() * 19) * box };
+            } else {
+                snake.pop();
+            }
+
+            let newHead = { x: snakeX, y: snakeY };
+
+            if(snakeX < 0 || snakeX >= canvas.width || snakeY < 0 || snakeY >= canvas.height || 
+               snake.some((seg, i) => i !== 0 && seg.x === newHead.x && seg.y === newHead.y)) {
+                clearInterval(game);
+                alert("Game Over, खुशदीप भाई! Score: " + score);
+                location.reload();
+            }
+            snake.unshift(newHead);
+        }
+
+        let game = setInterval(draw, gameSpeed);
+    </script>
+</body>
+</html>
