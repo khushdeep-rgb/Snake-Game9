@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Khushdeep's Ready Snake</title>
+    <title>Khushdeep's Snake Battle Royale</title>
     <style>
         body {
             display: flex;
@@ -12,191 +12,160 @@
             justify-content: center;
             height: 100vh;
             margin: 0;
-            background: #121212;
+            background: #111;
             color: #fff;
             font-family: 'Segoe UI', sans-serif;
-            overflow: hidden;
         }
         canvas {
-            border: 4px solid #444;
-            background-color: #000;
-            box-shadow: 0 0 20px rgba(46, 204, 113, 0.2);
+            border: 5px solid #444;
+            background: #000;
+            box-shadow: 0 0 20px rgba(0,255,0,0.2);
         }
-        .score-board {
-            font-size: 30px;
+        .scoreboard {
             margin-bottom: 10px;
-            font-weight: bold;
-            color: #2ecc71;
-        }
-        #message {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(0,0,0,0.8);
-            padding: 20px;
-            border-radius: 10px;
-            text-align: center;
-            border: 2px solid #2ecc71;
-            z-index: 10;
-        }
-        .controls {
-            margin-top: 20px;
+            font-size: 20px;
             display: grid;
-            grid-template-columns: repeat(3, 70px);
-            gap: 10px;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            text-align: center;
         }
-        button {
-            width: 70px;
-            height: 60px;
-            font-size: 24px;
-            background: #333;
-            border: 1px solid #555;
-            color: white;
-            border-radius: 10px;
-            cursor: pointer;
-        }
-        button:active { background: #2ecc71; }
-        .up { grid-column: 2; }
-        .left { grid-column: 1; }
-        .down { grid-column: 2; }
-        .right { grid-column: 3; }
+        .player { color: #2ecc71; font-weight: bold; }
+        .ai { color: #e74c3c; }
     </style>
 </head>
 <body>
 
-    <div class="score-board">SCORE: <span id="score">0</span></div>
-    
-    <div id="game-container" style="position: relative;">
-        <canvas id="snakeGame" width="400" height="400"></canvas>
-        <div id="message">साँप को चलाने के लिए <br> कोई भी Arrow Key दबाएं!</div>
+    <div class="scoreboard">
+        <div class="player">YOU (Green): <span id="pScore">0</span></div>
+        <div id="status" style="color: yellow;">Battle Royale: 5 Snakes!</div>
     </div>
 
-    <div class="controls">
-        <button class="up" onclick="changeDir('UP')">↑</button>
-        <button class="left" onclick="changeDir('LEFT')">←</button>
-        <button class="down" onclick="changeDir('DOWN')">↓</button>
-        <button class="right" onclick="changeDir('RIGHT')">→</button>
-    </div>
+    <canvas id="gameCanvas" width="600" height="400"></canvas>
 
     <script>
-        const canvas = document.getElementById("snakeGame");
+        const canvas = document.getElementById("gameCanvas");
         const ctx = canvas.getContext("2d");
-        const scoreElement = document.getElementById("score");
-        const messageBox = document.getElementById("message");
-
         const box = 20;
-        let score = 0;
-        let d = null; // गेम रुक कर शुरू होगा
-        let gameStarted = false;
-        let gameSpeed = 160;
 
-        let snake = [
-            { x: 9 * box, y: 10 * box },
-            { x: 8 * box, y: 10 * box }
+        let userScore = 0;
+        let gameRunning = true;
+
+        // Player Snake
+        let player = {
+            body: [{x: 10 * box, y: 10 * box}],
+            dir: "RIGHT",
+            color: "#2ecc71",
+            headColor: "#fff",
+            alive: true
+        };
+
+        // AI Snakes (4 AI)
+        let ais = [
+            { body: [{x: 2 * box, y: 2 * box}], dir: "RIGHT", color: "#e74c3c", alive: true },
+            { body: [{x: 27 * box, y: 2 * box}], dir: "LEFT", color: "#3498db", alive: true },
+            { body: [{x: 2 * box, y: 17 * box}], dir: "RIGHT", color: "#f1c40f", alive: true },
+            { body: [{x: 27 * box, y: 17 * box}], dir: "LEFT", color: "#9b59b6", alive: true }
         ];
 
         let food = {
-            x: Math.floor(Math.random() * 19) * box,
+            x: Math.floor(Math.random() * 29) * box,
             y: Math.floor(Math.random() * 19) * box
         };
 
         document.addEventListener("keydown", (e) => {
-            if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(e.key)) {
-                e.preventDefault();
-                startGame();
-            }
-            if(e.key === "ArrowLeft" && d !== "RIGHT") d = "LEFT";
-            else if(e.key === "ArrowUp" && d !== "DOWN") d = "UP";
-            else if(e.key === "ArrowRight" && d !== "LEFT") d = "RIGHT";
-            else if(e.key === "ArrowDown" && d !== "UP") d = "DOWN";
+            if(e.key === "ArrowLeft" && player.dir !== "RIGHT") player.dir = "LEFT";
+            else if(e.key === "ArrowUp" && player.dir !== "DOWN") player.dir = "UP";
+            else if(e.key === "ArrowRight" && player.dir !== "LEFT") player.dir = "RIGHT";
+            else if(e.key === "ArrowDown" && player.dir !== "UP") player.dir = "DOWN";
         });
 
-        function changeDir(dir) {
-            startGame();
-            if(dir === "LEFT" && d !== "RIGHT") d = "LEFT";
-            if(dir === "UP" && d !== "DOWN") d = "UP";
-            if(dir === "RIGHT" && d !== "LEFT") d = "RIGHT";
-            if(dir === "DOWN" && d !== "UP") d = "DOWN";
+        function drawObject(obj, isPlayer) {
+            if(!obj.alive) return;
+            obj.body.forEach((part, i) => {
+                ctx.fillStyle = (i === 0) ? (isPlayer ? "#fff" : obj.color) : obj.color;
+                ctx.fillRect(part.x, part.y, box-2, box-2);
+            });
         }
 
-        function startGame() {
-            if(!gameStarted) {
-                gameStarted = true;
-                messageBox.style.display = "none";
-            }
-        }
-
-        function drawGrid() {
-            ctx.strokeStyle = "#1a1a1a";
-            for (let i = 0; i <= canvas.width; i += box) {
-                ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); ctx.stroke();
-                ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(canvas.width, i); ctx.stroke();
-            }
-        }
-
-        function drawApple(x, y) {
-            ctx.fillStyle = "#ff4757";
-            ctx.beginPath(); ctx.arc(x + box/2, y + box/2 + 2, 8, 0, Math.PI * 2); ctx.fill();
-            ctx.strokeStyle = "#747d8c"; ctx.lineWidth = 2;
-            ctx.beginPath(); ctx.moveTo(x + box/2, y + 6); ctx.lineTo(x + box/2, y + 2); ctx.stroke();
-            ctx.fillStyle = "#2ed573";
-            ctx.beginPath(); ctx.ellipse(x + box/2 + 3, y + 3, 4, 2, Math.PI / 4, 0, Math.PI * 2); ctx.fill();
-        }
-
-        function drawSnake(part, index) {
-            if (index === 0) {
-                ctx.fillStyle = "#2ecc71";
-                ctx.beginPath(); ctx.roundRect(part.x, part.y, box, box, 5); ctx.fill();
-                ctx.fillStyle = "white";
-                if(d === "RIGHT") { ctx.fillRect(part.x + 12, part.y + 4, 4, 4); ctx.fillRect(part.x + 12, part.y + 12, 4, 4); }
-                else if(d === "LEFT") { ctx.fillRect(part.x + 4, part.y + 4, 4, 4); ctx.fillRect(part.x + 4, part.y + 12, 4, 4); }
-                else if(d === "UP") { ctx.fillRect(part.x + 4, part.y + 4, 4, 4); ctx.fillRect(part.x + 12, part.y + 4, 4, 4); }
-                else if(d === "DOWN") { ctx.fillRect(part.x + 4, part.y + 12, 4, 4); ctx.fillRect(part.x + 12, part.y + 12, 4, 4); }
-                else { ctx.fillRect(part.x + 12, part.y + 4, 4, 4); ctx.fillRect(part.x + 12, part.y + 12, 4, 4); }
+        function moveSnake(s) {
+            if(!s.alive) return;
+            let head = {x: s.body[0].x, y: s.body[0].y};
+            if(s.dir === "LEFT") head.x -= box;
+            if(s.dir === "UP") head.y -= box;
+            if(s.dir === "RIGHT") head.x += box;
+            if(s.dir === "DOWN") head.y += box;
+            s.body.unshift(head);
+            
+            if(head.x === food.x && head.y === food.y) {
+                if(s === player) {
+                    userScore++;
+                    document.getElementById("pScore").innerText = userScore;
+                }
+                food = { x: Math.floor(Math.random() * 29) * box, y: Math.floor(Math.random() * 19) * box };
             } else {
-                ctx.fillStyle = "#27ae60";
-                ctx.beginPath(); ctx.roundRect(part.x + 2, part.y + 2, box - 4, box - 4, 10); ctx.fill();
+                s.body.pop();
             }
         }
 
-        function draw() {
+        function aiLogic(ai) {
+            if(!ai.alive) return;
+            let head = ai.body[0];
+            // Simple AI: Move towards food
+            if (head.x < food.x && ai.dir !== "LEFT") ai.dir = "RIGHT";
+            else if (head.x > food.x && ai.dir !== "RIGHT") ai.dir = "LEFT";
+            else if (head.y < food.y && ai.dir !== "UP") ai.dir = "DOWN";
+            else if (head.y > food.y && ai.dir !== "DOWN") ai.dir = "UP";
+        }
+
+        function checkCollision(s) {
+            if(!s.alive) return;
+            let head = s.body[0];
+            // Wall
+            if(head.x < 0 || head.x >= canvas.width || head.y < 0 || head.y >= canvas.height) s.alive = false;
+            
+            // Self and Others
+            [player, ...ais].forEach(other => {
+                if(!other.alive) return;
+                other.body.forEach((part, i) => {
+                    if(s === other && i === 0) return; // skip own head
+                    if(head.x === part.x && head.y === part.y) s.alive = false;
+                });
+            });
+        }
+
+        function update() {
+            if(!player.alive) {
+                document.getElementById("status").innerText = "GAME OVER!";
+                document.getElementById("status").style.color = "red";
+                return;
+            }
+
             ctx.fillStyle = "black";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
-            drawGrid();
-            drawApple(food.x, food.y);
-            snake.forEach((part, index) => drawSnake(part, index));
 
-            if(!gameStarted) return; // जब तक शुरू न हो, आगे न बढ़ें
+            // Draw Food
+            ctx.fillStyle = "#ff4757";
+            ctx.beginPath();
+            ctx.arc(food.x + 10, food.y + 10, 8, 0, Math.PI*2);
+            ctx.fill();
 
-            let snakeX = snake[0].x;
-            let snakeY = snake[0].y;
+            // AI Decision
+            ais.forEach(ai => aiLogic(ai));
 
-            if(d === "LEFT") snakeX -= box;
-            if(d === "UP") snakeY -= box;
-            if(d === "RIGHT") snakeX += box;
-            if(d === "DOWN") snakeY += box;
+            // Move
+            moveSnake(player);
+            ais.forEach(ai => moveSnake(ai));
 
-            if(snakeX === food.x && snakeY === food.y) {
-                score++;
-                scoreElement.innerHTML = score;
-                food = { x: Math.floor(Math.random() * 19) * box, y: Math.floor(Math.random() * 19) * box };
-            } else {
-                snake.pop();
-            }
+            // Collisions
+            checkCollision(player);
+            ais.forEach(ai => checkCollision(ai));
 
-            let newHead = { x: snakeX, y: snakeY };
-
-            if(snakeX < 0 || snakeX >= canvas.width || snakeY < 0 || snakeY >= canvas.height || 
-               snake.some((seg, i) => i !== 0 && seg.x === newHead.x && seg.y === newHead.y)) {
-                clearInterval(game);
-                alert("Game Over, खुशदीप भाई! Score: " + score);
-                location.reload();
-            }
-            snake.unshift(newHead);
+            // Draw
+            drawObject(player, true);
+            ais.forEach(ai => drawObject(ai, false));
         }
 
-        let game = setInterval(draw, gameSpeed);
+        setInterval(update, 150);
     </script>
 </body>
 </html>
